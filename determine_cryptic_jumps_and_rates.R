@@ -17,7 +17,7 @@ linProg = function(d0){
   return(list("band" = band.mat, "lp" = lp("min",objective.in,const.mat,const.dir,const.rhs)))
 }
 
-# args[1] == inputfile args[2] == outfile
+# args[1] == inputfile, args[2] == outfile1:genename, theta, y, z, Diff , arg[3] == outfile, loss value of all sites
 args = commandArgs(trailingOnly = TRUE)
 
 avgs = read.table(args[1], sep="\t")
@@ -25,7 +25,7 @@ genename = as.character(avgs[1,1])
 WT.avg = as.numeric(avgs[1,7:(ncol(avgs))])
 mut.avg = as.numeric(avgs[2,7:(ncol(avgs))])
 
-#out.mat = c("Gene_Name","Best_Theta","Best_y","Best_z","Max_minus_Min_of_lossFunction")
+#out.mat = c("Gene_Name","gene.len", "Best_Theta","Best_y","Best_z","Max_minus_Min_of_lossFunction")
 read_length = 50
   
 gene.len = length(WT.avg)
@@ -95,9 +95,11 @@ if(continue==1){
   best.y = par[best.theta.ind,1]
   best.z = par[best.theta.ind,2]
 
-  out.mat = c(genename, best.theta, best.y, best.z, max(lf)-min(lf))  
+  out.mat = c(genename, gene.len, best.theta, best.y, best.z, max(lf)-min(lf))  
 }else{
-  out.mat = c(genename, "NA", "NA", "NA", "NA")
+  out.mat = c(genename, gene.len, "NA", "NA", "NA", "NA")
 }
 
 write.table(as.matrix(t(out.mat)), file=args[2], sep="\t", col.names=F, row.names=F, quote=F)
+
+write.table(as.matrix(t(lf)), file=args[3], sep="\t", col.names=F, row.names=F, quote=F)
