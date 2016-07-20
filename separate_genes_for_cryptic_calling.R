@@ -21,12 +21,12 @@ for(i in 1:nrow(WT_rep1.mat)){
   
   if(mean(WT.avg) <= 5 | mean(mut.avg) <= 5){
     cat(paste0("Gene #", i, " aka ", row.names(WT_rep1.mat)[i], " had too few reads! It has an average of ", mean(WT.avg), " WT reads and ", mean(mut.avg), " mutant reads; it must be at least 5\n"))
-    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "reads<=5"))
+    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "reads<=5 "))
     next
   }
   else if(length(WT.avg) <= 700){
     cat(paste0("Gene #", i, " aka ", row.names(WT_rep1.mat)[i], " was too small! It was ", length(WT.avg), " and it must be at least 700bp\n"))
-    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "lens<=700"))
+    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "lens<=700 "))
     next
   }
   
