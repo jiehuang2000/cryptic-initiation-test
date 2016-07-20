@@ -1,0 +1,907 @@
+\documentclass{article}
+
+% adding "set" above the equal sign
+\usepackage{mathtools}
+\newcommand\myset{\stackrel{\mathclap{\normalfont\mbox{set}}}{=}}
+
+\usepackage{amsgen,amsmath,amstext,amsbsy,amsopn,amssymb}
+\RequirePackage{bm}
+
+%only add number to a certain equation
+\usepackage{amsmath}
+\newcommand\numberthis{\addtocounter{equation}{1}\tag{\theequation}}
+
+%include images, stored in a subfolder named "images" of the current folder
+\usepackage{graphicx}
+\graphicspath{ {images/} }
+
+%packages for flow chart
+\usepackage[latin1]{inputenc}
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows}
+
+%packages for matlab
+\usepackage{listings}
+\usepackage{color} %red, green, blue, yellow, cyan, magenta, black, white
+\definecolor{mygreen}{RGB}{28,172,0} % color values Red, Green, Blue
+\definecolor{mylilas}{RGB}{170,55,241}
+
+
+
+
+
+%set up for matlab code
+\lstset{language=Matlab,%
+	%basicstyle=\color{red},
+	breaklines=true,%
+	morekeywords={matlab2tikz},
+	keywordstyle=\color{blue},%
+	morekeywords=[2]{1}, keywordstyle=[2]{\color{black}},
+	identifierstyle=\color{black},%
+	stringstyle=\color{mylilas},
+	commentstyle=\color{mygreen},%
+	showstringspaces=false,%without this there will be a symbol in the places where there is a space
+	numbers=left,%
+	numberstyle={\tiny \color{black}},% size of the numbers
+	numbersep=9pt, % this defines how far the numbers are from the text
+	emph=[1]{for,end,break},emphstyle=[1]\color{red}, %some words to emphasise
+	%emph=[2]{word1,word2}, emphstyle=[2]{style},    
+}
+
+\begin{document}
+\pagestyle{empty}
+
+\begin{title}
+	{\Large\bf A Stochastic Model  \\of Cryptic Initiation RNA-seq Data }
+\end{title}
+\author{ Jie Huang }
+\date{6/29/2016}
+\maketitle
+
+
+
+
+
+%----------------------------------------------------------------
+\tableofcontents
+\newpage
+\noindent
+\section{General Background}
+\begin{enumerate}
+	\item Summary: Study the cryptic initiation in SET2 deleted yeast cells after 60 minuts nutrition depletion, by comparing its RNA-seq data with wild type control data.
+	\item SET2 gene performs histone 1,2,3-methylation, which regulates expression of many genes. During transcription, histones are distablized so that the corresponding DNA regions can be transcripted into mRNA, and immediately after transcription, histones are re-stablized to wrap DNA. But in the SET2 deleted cells, some histones can't be re-stablized, so transcription might be leaky from the middle of the genes, which is called \textbf{cryptic initiation}.
+	\item SET2 is related \textbf{nutrition depletion} in yeast. Yeast cells without SET2 live normal when nutrition is abundant, but will die quick under nutrition depletion condition. So SET2 gene might regluate nutrition related genes.
+	\item \textbf{RNA-seq} is a method to sequence the whole transcriptome. In our example, we use RNA-seq to detect cryptic initiation. According to our hypothesis, in WT cells, all mRNA sequence are complete, i.e., including 5' upstream untranslated sequence, the complete coding sequence, 
+	\item \textbf{Nucleosom} is the structural unit in eukaryotes, which is made of a piece of DNA (about 150bp) and 4 pairs of histones (octamer: H2A, H2B, H3, H4).
+\end{enumerate}
+
+%----------------------------------------------------------------
+\newpage
+\section{Method Summary}
+
+% Define block styles
+\tikzstyle{decision} = [diamond, draw, fill=blue!20, 
+    text width=4.5em, text badly centered, node distance=3cm, inner sep=0pt]
+\tikzstyle{block} = [rectangle, draw,  
+    text width=30em, text centered, rounded corners, minimum height=4em]
+\tikzstyle{line} = [draw, -latex']
+\tikzstyle{cloud} = [draw, ellipse, node distance=3cm,
+    minimum height=2em]
+\begin{tikzpicture}[node distance = 2cm, auto]
+% Place nodes
+ \node [block] (cell) {yeast cell culture (about 1 million cells)};
+ \node [block, below of=cell] (type) {control group: Wild Type, 
+ 	
+ 	 experiment group: SET2 deleted, 
+ 	 
+ 	 with 3 replicates each};
+ \node [block, below of=type] (nutri) {nutrition depletion 60 mins};
+ \node [block, below of=nutri] (extract) {extract mRNA using Ribo(-): get rid of all Ribosome RNAs };
+ \node [block, below of=extract] (seq) {break RNA into pieces and RNA-seq (usually 30M reads, each read length exactly 50bp)};
+ \node [block, below of=seq] (match) {matching to yeast genome and count the read number for each position in the coding region of each gene};
+ \node [block, below of=match] (RPKM) {standardize reads by $RPKM= \frac{read}{totalNumReads/1 million}$};
+ \node [block, below of=RPKM] (sense) {differentiate sense and antisense expression};
+ \node [block, below of=sense] (model) {model data as $M(t)/G/\infty$ queue to tell whether there is cryptic initiation or not};
+ % Draw edges
+ \path [line] (cell) -- (type);
+ \path [line] (type) -- (nutri);
+ \path [line] (nutri) -- (extract);
+ \path [line] (extract) -- (seq);
+ \path [line] (seq) -- (match);
+ \path [line] (match) -- (RPKM);
+ \path [line] (RPKM) -- (sense);
+ \path [line] (sense) -- (model);
+\end{tikzpicture}
+
+%----------------------------------------------------------------
+\newpage
+\section{Data and Objective}
+
+\begin{enumerate}
+	\item RNA expression data (in terms of read counts for each site in the coding region)for all 6693 yeast genes in wild type group and SET2 deleted group, each with 3 repeats. Data processing in Matlab is in Section \ref{readfile} and \ref{avg}.
+	\item Infer whether there is cryptic initiation for each gene, and if there is, where the cryptic initiation starts. A typical read plot of positive case is in Figure \ref{lcb5data}, and negative case is i Figure \ref{cdc5data}.
+	\item Whether genes with cryptic initiation genes correlates with nuition related genes (Steven's project).
+	\item Are there any patterns where cryptic initiation starts? For examples, does it prefer to start around regions with certain nucleotide sequence pattern (like the TATA box), or does it correlate with positioning of nucleosomes? Are there any groups of genes which tends to have more cryptic initiation?  
+	\item Do $\lambda(t)$'s correlate with certain patterns?
+	\item Can this method be widely applied to sequencing data?
+\end{enumerate}
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{lcb5_data}
+	\caption{Positive case example: Reads plot of lcb5}
+	\label{lcb5data}
+\end{figure}
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{cdc5_data}
+	\caption{Negative case example: Reads plot of cdc5}
+	\label{cdc5data}
+\end{figure}
+
+%----------------------------------------------------------------
+
+\newpage
+\section{Method in Detail}
+\subsection{$M(t)/G/\infty$ Model}
+
+Assuming that for each gene, the starting point of each returned read from RNA-seq is a non-homogeneous Possion Process with parameter $\lambda(t)$ (PP($\lambda(t)$), where t corresponds to the starting position in the gene. Then this is a $M(t)/G/\infty$ queue, with service distribution Determinist(50), the CDF of which is 
+\[
+G(x)= P(X \le x)=
+\begin{cases}
+1,& \text{if } x\le 50,\\
+0,              & \text{if } x > 50.
+\end{cases}
+\]
+
+The read at each position, $d(t)$, is a Poisson random variable with parameter 
+\begin{align*}
+\int_0^t \lambda(t)(1-G(t-s)) ds &=\int_0^t \lambda(t-s)(1-G(s))ds\\
+&=  \begin{cases}
+\int_0^{50} \lambda(t-s)ds, & \text{if } t > 50\\
+\int_0^t \lambda(t-s)ds,    & \text{if } x \le 50
+\end{cases}\\
+&=\int_{(t-50)^+}^{t} \lambda(s)ds\\
+&=\sum_{(t-50)^+}^{t} \lambda(s) \text{ (written in the discrete form)}
+\end{align*}
+
+The above result can be intuitively intepreted as, for the mean value of read at each position t, d(t), is the cummulative result of lambda(s) the previous 50 positions (including position t), i.e.:
+\begin{align*}
+d(1) &= \lambda(1),\\
+d(2) &= \lambda(1)+\lambda(2),\\
+d(3) &= \lambda(1)+\lambda(2)+\lambda(3),\\
+...\\
+d(50)&= \lambda(1)+\lambda(2)+... + \lambda(50),\\
+d(51)&= \quad \quad \quad  \lambda(2)+\lambda(3)+... + \lambda(51),\\
+d(52)&= \quad \quad \quad\quad \quad \quad\lambda(3)+\lambda(4)+... + \lambda(52),\\
+...\\
+d(L)&=\quad \quad \quad\quad \quad \quad\quad \quad \quad\quad \quad \quad \lambda(L-49)+\lambda(L-48)+... + \lambda(L).\\
+&\quad \quad \quad\quad \quad \quad\quad \quad \quad\quad \quad \quad \quad \text{(suppose the total length of mRNA is L)}\\
+\text{i.e., } d&=X\lambda\\
+\text{where } d&=[d(1),d(2),...,d(L)]^T, \lambda=[\lambda(1),\lambda(2),...,\lambda(L)]^T\\
+&\text{and X is an L by L matrix, corresponding to coefficients of } \lambda's
+\end{align*}
+
+Therefore, $\lambda$ could be calculated as $\lambda=X^{-1}d$, given observed d.
+
+\subsection{Linear Optimization to estimate $\lambda_0$ from $d_0$}
+
+However, in our yeast RNA-seq data, mRNA, and so the RNA-seq, starts from 5' untranslated upstream region, and ends with PloyA tail, but only the coding sequence can be mapped precisely to the yeast genome and used with confidence. So we are missing data of $d(1) ,..., d(t_0)$ and $d(t_1) ,..., d(L)$, which corresponding the unstream  and downstream reads respectively. In this case, we have more $\lambda$'s to infer than $d$'s. We solved this problem by using linear programming in the following construction.
+
+\begin{align*}
+\text{min: } &\sum_{i=1}^{T+49} \lambda_{0}(i)\\
+\text{s.t. } &F\lambda_0 \ge d_0,\\
+ &\lambda_0 \ge 0,
+\end{align*}
+
+where T is the length of coding region, the reads of which in the wild type group is denoted as $d_0=[d_0(1),d_0(2),...,d_0(T)]^T$, $\lambda_0 = [\lambda_0(-48),\lambda_0(-47),...,\lambda_0(T)]^T$ is the rate parameter of upstream 49 base pairs as well as the coding region in the wild type group. $F$ is a $T \times (T+49)$ bind matrix showing as below: 
+
+\begin{equation}\label{F}
+F=\begin{pmatrix}
+	1&1&...&1&0&0&0&0&0&0\\
+	0&1&1&...&1&0&0&0&0&0\\
+	0&0&1&1&...&1&0&0&0&0\\
+	\hdotsfor{3} \\
+	0&0&0&0&1&1&...&1&0&0\\
+	0&0&0&0&0&1&1&...&1&0\\
+	0&0&0&0&0&0&1&1&...&1\\
+\end{pmatrix},
+\end{equation}
+each row has 50 1's, which corresponds to adding the previous 50 $\lambda_0(t)$ to get the $d_0(t)$.
+
+The corresponding matlab code is:
+
+ \begin{lstlisting}[frame=single]
+function[lam0]=lp(d0)
+
+T=length(d0);
+b=50;
+F= zeros(T,T+b-1);
+for i = 1:b;F(:,i:T+i-1)=F(:,i:T+i-1)+diag(ones(1,T),0);end
+
+A = [];
+bb = [];
+x0 =zeros(T+b-1,1);
+f = ones(T+b-1,1); f=f';
+lb= zeros(T+b-1,1);
+ub= ones(T+b-1,1)*100;
+options = optimoptions('linprog','Algorithm','simplex');
+
+lam0= linprog(f,-F,-d0,A,bb,lb,ub,x0,options); 
+end
+ \end{lstlisting}
+
+In this way, we will have the estimation of $\lambda_0$ from $d_0$. We will write it as $\hat{\lambda_0}$. One example of  $\hat{\lambda_0}$ is shown in Figure \ref{lam0}. Using this $\hat{\lambda_0}$, we could recover the estimated $\hat{d_0}$ by $\hat{d_0} = F\hat{\lambda_0} $, the comparision of $\hat{d_0}$ with the raw $d_0$ is in Figure \ref{d0hat}.
+
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{lcb5_lam0}
+	\caption{Rate parameter estimator: $\hat{\lambda_0}(t)$}
+	\label{lam0}
+\end{figure}
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{lcb5_d0_opt}
+	\caption{Optimized $\hat{d_0}$ v.s. raw $d_0$}
+	\label{d0hat}
+\end{figure}
+
+\subsection{Estimate $d_1$ from $\hat{\lambda_0}$ }
+Under our assumption that cryptic initiation in the SET2 deleted yeast cells starts at a single point, say $\theta$, the estimator of rate parameter $\lambda_1(t)$ can be expressed as:
+\begin{equation}\label{lam1}
+ \hat{\lambda_1}(t) =
+\begin{cases}
+y \hat{\lambda_0}(t)       & \quad \text{if } -48 \le t \le \theta-1, \\
+(y+z) \hat{\lambda_0}(t)& \quad \text{if } \theta \le t \le T,\\
+\end{cases}
+\end{equation}
+
+\begin{equation}\label{d1lam1}
+\hat{d_1} = F \hat{\lambda_1},
+\end{equation}
+
+where $\hat{d_1} =[\hat{d_1}(1),\hat{d_1}(2),...,\hat{d_1}(T)]^T$, is the estimated reads in the SET2 deleted experiment, and $\hat{\lambda_1} = [\hat{\lambda_1}(-48) +\hat{\lambda_1}(-47),...,\hat{\lambda_1}(T)]^T$. 
+
+
+This is to say, for a fixed gene in the SET2 deleted cells, setting the level of full length mRNA in the wild type cell as 1 unit,  the number of full length mRNA is y units, and there are extra z units of incomplete mRNAs starting from the $\theta$-th nucleotide in the coding sequence. To filtering positive cases of cryptic initiation, we want to estimate $z$. If $\hat{z}>0$ with statistical significance, there is evidence of cryptic initiation. Besides, if there is cryptic initation, we want to know where it starts, which is $\hat{\theta}$.
+
+Combining Equation \ref{lam1} and \ref{d1lam1}, we will have the following equation, which expresses $\hat{d_1}$ as a funtion of $\hat{\lambda_0}$:
+
+\begin{equation}
+\hat{d_1}=(yX_y+zX_z)\hat{\lambda_0}\quad (\quad \myset X \hat{\lambda_0}),
+\end{equation}
+
+Where $X_y = F$ in Equation \ref{F}, $X = yX_y+zX_z$, and for a fixed $\theta$,
+
+\begin{equation}\label{Xz}
+X_z=\begin{pmatrix}
+0&0&0&0&\dots&0&0&0&0&0\\
+0&0&0&0&\dots&0&0&0&0&0\\
+0&0&0&0&\dots&0&0&0&0&0\\
+\dots \\
+\hline
+0&0&0&0&\vline1&0&0&0\vline&0&0\\
+0&0&0&0&\vline1&1&0&0\vline&0&0\\
+0&0&0&0&\vline1&1&1&0\vline&0&0\\
+\dots &&&& \dots \\
+0&0&0&0&\vline1&1&\dots&1\vline&0&0\\
+\hline
+0&0&0&0&0&1&1&\dots&1&0\\
+\dots \\
+0&0&0&0&0&0&1&1&\dots&1\\
+\end{pmatrix},
+\end{equation}
+
+
+
+
+where $X_z$ is in the same dimention with $F$, and the first column of $1$'s corresponds to the position of $\theta$, where the cryptic initiation starts. (That is a 50 by 50 lower triangular sub-matrix, followed by a bind sub-matrix, in which each row has 50 1's ).
+\newline
+
+\subsection{Estimate y and z using least square method }
+
+For each $\theta$, we estimate y and z using the least square method.
+
+\begin{align*}
+\text{min: } &loss(y,z) = \sum_{t=1}^{T} (d_1(t)-\hat{d_1}(t))^2\\
+\text{s.t.: } &y \ge 0,\\
+&z \ge 0,
+\end{align*}
+
+where 
+\begin{align*}
+loss(y,z) &= (d_1-\hat{d_1})^T(d_1-\hat{d_1})\\
+&=(d_1-X\hat{\lambda_0})^T(d_1-X\hat{\lambda_0})\\
+(&=(d_1-(yX_y+zX_z)\hat{\lambda_0})^T(d_1-(yX_y+zX_z)\hat{\lambda_0})) \numberthis \label{loss}\\
+&=d_1^T d_1 -2\hat{\lambda_0}^T X^T d_1 + \hat{\lambda_0}^T X^T X \hat{\lambda_0}, \\
+\end{align*}
+
+Therefore,
+
+\begin{align*}
+\frac{\partial loss(y,z)}{\partial y} &=-2\hat{\lambda_0}^T X_y^T d_1 + \hat{\lambda_0}^T (X_y^T X + X^T X_y) \hat{\lambda_0}\\
+&= -2\hat{\lambda_0}^T X_y^T d_1 + \hat{\lambda_0}^T \bigg(X_y^T (yX_y+zX_z) + (yX_y+zX_z)^T X_y\bigg) \hat{\lambda_0}\\
+&= -2\hat{\lambda_0}^T X_y^T d_1 + y \bigg( 2\hat{\lambda_0}^T X_y^T X_y \hat{\lambda_0}  \bigg) + z \bigg( \hat{\lambda_0}^T (X_y^T X_z+X_z^T X_y) \hat{\lambda_0}  \bigg) \\
+&\myset 0,\numberthis \label{loss_y}\\
+\\
+\text{similarily, }\\
+\frac{\partial loss(y,z)}{\partial z} &= -2\hat{\lambda_0}^T X_z^T d_1 + y \bigg( \hat{\lambda_0}^T (X_y^T X_z+X_z^T X_y) \hat{\lambda_0}  \bigg) + z \bigg( 2\hat{\lambda_0}^T X_z^T X_z \hat{\lambda_0}  \bigg) \\
+ &\myset 0,\numberthis \label{loss_z}
+\end{align*}
+
+We will have the estimator $\hat{y}$ and $\hat{z}$ by solving Equation \ref{loss_y} and \ref{loss_z}. If $\hat{z}$ is negative, we will use $\hat{z}=0$, and slove Equation \ref{loss_y} to get $\hat{y}$. Then plug $\hat{y}$ and $\hat{z}$ in Equation \ref{loss} to get $\hat{loss}(y,z)$.
+
+
+In this way, we calculate $\hat{loss}(y,z)$ for each $\theta$ (using only $150 < \theta < T-150$, becuase cryptic initiation is unlikely to happen in the first and last nucleosome), and choose the $\theta$ with the smallest square error loss. We also standardize $\hat{loss}(y,z)$ by using  Mean Square Root Loss: MSRL = $\sqrt{\frac{\hat{loss}(y,z)}{T}}$.
+
+
+(Notice that the first and last 100 sites are with relatively low sequencing quality, so in the calculation of $\hat{loss}(y,z)$, they are omitted by setting first and last 100 rows of $X_y$ and $X_z$ to be all 0's, and calculating MSRL = $\sqrt{\frac{\hat{loss}(y,z)}{T-200}}$.)
+
+The Matlab code is in Section \ref{ols}.
+
+\subsection{Further steps}
+
+Because each sequece we have 3 repeats of reads, we do a pairwise comparision ($d_0$ rep1 vs. $d_1$ rep1, $d_0$ rep1 vs. $d_1$ rep2, etc.), and a comparision between the average reads of the 3 repeats ($d_0$ avg vs. $d_1$ avg,). The result shows that overall, using the average reads gives much lower loss, which implies better fit (see Figure \ref{lcb5loss}), so we only use average reads in the genome wide analysis.
+
+Then this method is applied to all 6693 genes of yeast genome. The Matlab file is in Section \ref{runols}.
+
+\begin{figure}[h]
+	\includegraphics[scale=.5]{loss_10}
+	\caption{Positive case example: MSRL of lcb5}
+	\label{lcb5loss}
+\end{figure}
+
+\section{Results}
+\subsection{Positive Case Example-Lcb5}
+
+Running the programs on lcb5, the gene whose read plot shown in \ref{lcb5data}, gives the following figures. 
+
+\begin{enumerate}
+	\item Figure \ref{lcb5loss} shows MSRL evaluated at different $\theta$'s, there is a clear mininum MSRL at $\theta \approx 800$. The range of MSRL is from 9 to 21 for the average group (yellow solid line).
+	\item Figure \ref{lcb5yz} shows the y and z estimators at corresponding $\theta$'s. At $\theta \approx 800$, we can see that $\hat{y} \approx 0.4$, $\hat{z} \approx 1.4$.
+	\item Figure \ref{lcb5d1pred} shows the comparison of predicated $d_1$ (in blue) vs. raw $d_1$ (in red) reads. The fitting is overall very good, especially the region near the cryptic initiation starting point.
+\end{enumerate}
+
+
+\begin{figure}[h]
+	\includegraphics[scale=.5]{lcb5_y_z}
+	\caption{Positive case example: y (v shaped) and z ($\Lambda$ shaped) estimators of lcb5}
+	\label{lcb5yz}
+\end{figure}
+
+
+
+
+\subsection{Negative Case Example-Cdc5}
+
+\begin{enumerate}
+	\item The gene read plot is shown in Figure \ref{cdc5data}.
+	\item Figure \ref{cdc5loss} shows MSRL evaluated at different $\theta$'s, the overall line is very flat, with very few flutuations. And the range of MSRL difference is within 1. 
+	\item Figure \ref{cdc5yz} shows the y and z estimators at corresponding $\theta$'s. 
+\end{enumerate}
+
+
+
+\subsection{Ambiguous Case Example-Smc3}
+
+\begin{enumerate}
+	\item The gene read plot is shown in Figure \ref{smc3data}. The cryptic initiation starting point is not very clear. There might exist multiple starting points. 
+	\item Figure \ref{smc3loss} shows MSRL evaluated at different $\theta$'s, there is no sharp drop aound a single point of $\theta$. 
+\end{enumerate}
+
+
+
+
+%----------------------------------------------------------------
+\newpage
+\section{Technical Notation}
+\begin{enumerate}
+	\item \textbf{Yeast Introns} Yeast genes rarely have introns. For introns in eukaryotes, they are spliced while during the transcription, so at the end of transcription, mRNA is processed to be without the introns. But in the RNA-seq data, there are still some intron signals, which need to take care of specifically.
+\end{enumerate}
+
+
+%----------------------------------------------------------------
+\newpage
+\section{References}
+\begin{enumerate}
+	\item SET2 / YJL168C Overview\\ http://www.yeastgenome.org/locus/S000003704/overview
+\end{enumerate}
+
+%----------------------------------------------------------------
+
+\section{Supporting Figures}
+
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{lcb5_d1pred}
+	\caption{Positive case example: Predicated $d_1$ vs. raw $d_1$ vs raw $d_0$}
+	\label{lcb5d1pred}
+\end{figure}
+
+
+\begin{figure}[h]
+	\includegraphics[scale=.6]{cdc5_loss}
+	\caption{Negative case example: MSRL of cdc5}
+	\label{cdc5loss}
+\end{figure}
+
+\begin{figure}[h]
+	\includegraphics[scale=.6]{cdc5_y_z}
+	\caption{Negative case example: y (upper cluster) and z (lower cluster) estimators of cdc5}
+	\label{cdc5yz}
+\end{figure}
+
+\begin{figure}[h]
+	\includegraphics[scale=.3]{smc3_data}
+	\caption{Ambiguous case example: Reads plot of smc3}
+	\label{smc3data}
+\end{figure}
+
+\begin{figure}[h]
+	\includegraphics[scale=.5]{smc3_loss}
+	\caption{Ambiguous case example: Negative case example: MSRL of smc3}
+	\label{smc3loss}
+\end{figure}
+
+
+
+
+%----------------------------------------------------------------
+\newpage
+\section{Supplementary Materials}
+\subsection{ols.m} \label{ols}
+
+Here is the Matlab code of the function ols.m (ols stands for ordinary least square):
+
+\begin{lstlisting}[frame=single]
+%Input: 
+%d0: column vector of WT group read
+%d1: column vector of SET2 deleted group read
+%step: step size of theta, i.e., th=150:step:T-150
+%ZoomIn: 1 or 0, if 1, more precise calculation with range: th2= (theta-step):2:(theta+step);
+%lam0: column vector lam0 returned from the Linear Programming optimization
+
+%output:
+%th_new: column vector of theta's that are evaluated at
+%loss_new: column vector of Mean square root loss (MSRL) at each theta
+%y_new: column vector of estimated y at each theta
+%z_new: column vector of estimated z at each theta
+%theta: scalar, best theta that returns the smallest MSRL
+%d1pred: column that returns that predicted d1 using best theta, best y and best z
+%y: scalar, best y that returns the smallest MSRL
+%z: scalar, best z that returns the smallest MSRL
+
+
+function[th_new,loss_new,y_new,z_new,theta,d1pred,y,z]=ols(d0,d1,step,ZoomIn,lam0)
+T=length(d0);
+b=50;
+F= zeros(T,T+b-1);
+for i = 1:b;
+F(:,i:T+i-1)=F(:,i:T+i-1)+diag(ones(1,T),0);
+end
+
+th=150:step:T-150;
+th=horzcat(th,T);
+
+par = zeros(length(th),2);
+l = zeros(length(th),1);
+
+%%ignore the first and last 100 positions in d1 and d1_estimates
+d1middle=d1;
+d1middle(T-99:T)=0;
+d1middle(1:100)=0;
+Xy=F;
+Xz=F;
+Xy(T-99:T,:)=0;
+Xz(T-99:T,:)=0;
+Xy(1:100,:)=0;
+Xz(1:100,:)=0;
+a11 = 2*(lam0)'*(Xy)'*Xy*lam0;
+b1 = 2*(lam0)'*(Xy)'*d1middle;
+for i=1:length(th)-1
+Xz(:,1:th(i)+b-2) = 0;
+a12 = (lam0)'*((Xy)'*Xz+(Xz)'*Xy)*lam0;
+a22 = 2*(lam0)'*(Xz)'*Xz*lam0;
+b2 = 2*(lam0)'*Xz'*d1middle;
+A =  [a11  a12
+a12    a22];
+Rhs = [b1; b2];
+
+par(i,:) = A\Rhs;
+
+if par(i,2) < 0;
+par(i,2)=0;
+par(i,1)=b1/a11;
+end
+y = par(i,1); z = par(i,2);
+X= y*Xy +z*Xz;
+l(i) = sqrt((d1middle'*d1middle - 2*lam0'* X'* d1middle + lam0'* (X)' * X * lam0)/(T-200)); 
+end
+
+par(end,1) = b1/a11;
+X= par(end,1)*Xy;
+l(end) = sqrt((d1middle'*d1middle - 2*lam0'* X'* d1middle + lam0'* (X)' * X * lam0)/(T-200)); 
+
+
+% plot(th,par,'-x');
+% legend('y','z');
+% print('y_z(WT&Mutation)','-dpng');
+% stairs(th,l,'-x');
+% print('loss(WT&Mutation)','-dpng');
+
+[~,I] = min(l);
+
+theta = th(I);
+y=par(I,1);
+z=par(I,2);
+
+%%%%%%%%%%%%%%%%
+% Zoom in to the round near the best theta
+if ZoomIn==1
+
+th2= (theta-step):2:(theta+step);
+par2 = zeros(length(th2),2);
+l2 = zeros(length(th2),1);
+
+%%ignore the first and last 100 positions in d1 and d1_estimates
+Xz=F;
+Xz(T-99:T,:)=0;
+Xz(1:100,:)=0;
+for i=1:length(th2)
+th2(i);
+Xz(:,1:th2(i)+b-2) = 0;
+a12 = (lam0)'*((Xy)'*Xz+(Xz)'*Xy)*lam0;
+a22 = 2*(lam0)'*(Xz)'*Xz*lam0;
+b2 = 2*(lam0)'*Xz'*d1middle;
+A =  [a11  a12
+a12    a22];
+Rhs = [b1; b2];
+
+par2(i,:) = A\Rhs;
+
+if par2(i,2) < 0;
+par2(i,2)=0;
+par2(i,1)=b1/a11;
+end
+y = par2(i,1); z = par2(i,2);
+X= y*Xy +z*Xz;
+l2(i) = sqrt((d1middle'*d1middle - 2*lam0'* X'* d1middle + lam0'* (X)' * X * lam0)/(T-200)); 
+end
+
+%     plot(th2,par2,'-x');
+%     legend('y','z');
+%     print('y_z, zoom in','-dpng');
+%     stairs(th2,l2,'-x');
+%     print('loss, zoom in','-dpng');
+
+
+[~,I2] = min(l2);
+
+theta = th2(I2);
+y=par2(I2,1);
+z=par2(I2,2);
+
+th_new=horzcat(th(1:I-1),th2(2:end-1),th(I+1:end));
+loss_new=vertcat(l(1:I-1),l2(2:end-1),l(I+1:end));
+y1=par(:,1); z1 = par(:,2);
+y2=par2(:,1); z2 = par2(:,2);
+y_new=vertcat(y1(1:I-1),y2(2:end-1),y1(I+1:end));
+z_new=vertcat(z1(1:I-1),z2(2:end-1),z1(I+1:end));
+
+else %correspoding to ZoomIn==0
+th_new = th;
+loss_new=l;
+y_new=par(:,1);
+z_new=par(:,2);
+end
+%%%%%%%%%%%%%%%%%%
+
+
+% stairs(th_new,loss_new,'.-')
+% print('Mean Square Root Loss','-dpng','-r300');
+% 
+% plot(th_new,y_new,'.-',th_new,z_new,'.-')
+% legend('y','z');
+% print('y and z','-dpng','-r300');
+
+
+%%change theta to the one with smallest square error loss:
+Xz=F;
+Xz(:,1:theta+b-2) = 0;
+X=y*F +z*Xz;
+d1pred=X*lam0;
+% plot(1:T,d1,'r-',1:T,d0,'k-',1:T,d1pred,'b-.')
+% legend('Mutation (d1)','WT (d0)','pred Mutation (d1 pred)')
+% print('pred_Mut(WT&Mutation)','-dpng','-r300');
+% 
+% filename='output.mat';
+% save(filename);
+end
+\end{lstlisting}
+
+
+\subsection{readfile.m} \label{readfile}
+\begin{lstlisting}[frame=single]
+%read in all gene sequences and convert them to arrays
+
+cd /Users/JieHuang1/Downloads
+
+tic
+
+fid=fopen('yeast_WT_60min_Rep1_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d0_1 = cell(num,1);
+
+for i=1:num;
+d0_1{i} = tlines{i+1};
+d0_1{i}=d0_1{i}(36:end);
+d0_1{i} = strrep(d0_1{i}, 'NA', '');
+d0_1{i} = str2num(d0_1{i});
+end
+
+fid=fopen('yeast_WT_60min_Rep2_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d0_2 = cell(num,1);
+
+for i=1:num;
+d0_2{i} = tlines{i+1};
+d0_2{i}=d0_2{i}(36:end);
+d0_2{i} = strrep(d0_2{i}, 'NA', '');
+d0_2{i} = str2num(d0_2{i});
+end
+
+fid=fopen('yeast_WT_60min_Rep3_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d0_3 = cell(num,1);
+
+for i=1:num;
+d0_3{i} = tlines{i+1};
+d0_3{i}=d0_3{i}(36:end);
+d0_3{i} = strrep(d0_3{i}, 'NA', '');
+d0_3{i} = str2num(d0_3{i});
+end
+
+
+fid=fopen('yeast_SET2del_60min_Rep1_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d1_3 = cell(num,1);
+
+for i=1:num;
+d1_3{i} = tlines{i+1};
+d1_3{i}=d1_3{i}(36:end);
+d1_3{i} = strrep(d1_3{i}, 'NA', '');
+d1_3{i} = str2num(d1_3{i});
+end
+
+
+fid=fopen('yeast_SET2del_60min_Rep2_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d2_3 = cell(num,1);
+
+for i=1:num;
+d2_3{i} = tlines{i+1};
+d2_3{i}=d2_3{i}(36:end);
+d2_3{i} = strrep(d2_3{i}, 'NA', '');
+d2_3{i} = str2num(d2_3{i});
+end
+
+
+fid=fopen('yeast_SET2del_60min_Rep3_senseStrand_full_genes_filledNAs_named.coord');
+tline = fgetl(fid);
+tlines = cell(0,1);
+while ischar(tline)
+tlines{end+1,1} = tline;
+tline = fgetl(fid);
+end
+fclose(fid);
+
+x = size(tlines); %number of lines in the imported file
+num = x(1)-1; %total number of genes
+d1_3 = cell(num,1);
+
+for i=1:num;
+d1_3{i} = tlines{i+1};
+d1_3{i}=d1_3{i}(36:end);
+d1_3{i} = strrep(d1_3{i}, 'NA', '');
+d1_3{i} = str2num(d1_3{i});
+end
+
+toc
+\end{lstlisting}
+
+
+\subsection{avg.m} \label{avg}
+\begin{lstlisting}[frame=single]
+%calculate the average of three repeats, and get d0, d1 respectively
+
+num = length(d1_1); %total number of genes
+d1=cell(num,1);
+len = zeros(num,1);
+for i=1:num
+temp1=d1_1{i};temp2=d1_2{i};temp3=d1_3{i};
+len(i) = length(temp1);
+temp = zeros(len(i),1);
+for j = 1:len(i)
+temp(j) = (temp1(j)+temp2(j)+temp3(j))/3;
+end
+d1{i}=temp;
+end
+
+
+% i=4148; %lcb5;
+% T=length(d0{i});
+% plot(1:T,d0_1{i},1:T,d0_2{i},1:T,d0_3{i},1:T,d0{i},'k.-',1:T,d1_1{i},1:T,d1_2{i},1:T,d1_3{i},1:T,d1{i},'r.-')
+% plot(1:T,d0{i},'k.-',1:T,d1{i},'r.-')
+
+
+%for some reason, the i=1875:1879 genes, d0 is 1bp shorter than d1, so I
+%just cut the last bp of d1;
+for i=1:num; 
+if length(d0{i}) ~= length(d1{i});
+k=min(length(d0{i}),length(d1{i}));
+d0{i}=d0{i}(1:k);
+d1{i}=d1{i}(1:k);
+end;
+end
+\end{lstlisting}
+
+
+\subsection{runols.m} \label{runols}
+\begin{lstlisting}[frame=single]
+cd /Users/JieHuang1/Dropbox/JieHuang/datafile 
+
+%  Input: 
+%  d0: 6693*1 cell arrays of WT reads of all 6693 genes,
+%  d1: 6693*1 cell arrays of SET2 deleted reads of all 6693 genes
+
+% Output:
+% id: gene id corresponding the original matrix file line number (like 1,2
+% 3,..., 6693)
+% gene_length
+% th: the evaluated theta for each gene
+% th_num : number of theta evaluated in each gene
+% best_theta: theta that give the smallest loss
+% 
+% loss : loss at each theta
+% lossmax 
+% lossmin 
+% lossavg
+% 
+% yy : y at each theta
+% zz : z at each theta
+% best_y 
+% best_z 
+% lam: lam0 returned after LP for each gene
+%  
+num = length(d1_1); %total number of genes
+step=30; %using a theta step size of 30
+
+ZoomIn=0;
+
+id=zeros(1,num); %the id number of the gene
+gene_length = zeros(1,num); %length of the gene
+th = zeros(1000,num);  %  theta's evaluated in each gene
+th_num = zeros(1,num); %number of theta evaluated in each gene
+best_theta=zeros(1,num); %theta that give the smallest loss
+
+loss = zeros(1000,num);%loss at each theta
+lossmax = zeros(1,num);
+lossmin = zeros(1,num);
+lossavg = zeros(1,num);
+
+yy = zeros(1000,num); % y at each theta
+zz = zeros(1000,num); % z at each theta
+best_y =zeros(1,num); 
+best_z = zeros(1,num);
+lam=cell(num,1);
+tic
+starttime=datestr(now)
+for i = 1:num 
+id(i)=i;
+seq0 = d0{i};
+T=length(seq0);
+gene_length(i) = T;
+
+if T >= 10000 ||sum(seq0)/T < 5
+continue; 
+end
+currenttime=datestr(now)
+i
+T
+seq1 = d1{i};
+
+%     geneId= num2str(i);
+%     dirName=strcat('/Users/JieHuang1/Downloads/',geneId);
+%     mkdir('/Users/JieHuang1/Downloads', geneId);
+%     cd(dirName);
+
+[lam0]=lp(seq0);
+lam{i}=lam0;
+[th1gene,l,y,z,best_th_1gene,d1pred,y_1gene,z_1gene]=ols(seq0,seq1,step, ZoomIn, lam0);
+
+k=length(th1gene);
+th_num(i)=k;
+th(1:k,i)=th1gene;
+loss(1:k,i)=l;
+yy(1:k,i)=y;
+zz(1:k,i)=z;
+best_theta(i)=best_th_1gene;
+best_y(i) = y_1gene;
+best_z(i) = z_1gene;
+lossmax(i) = max(l);
+lossmin(i) = min(l);
+lossavg(i) = mean(l);
+
+%     plot(1:length(d0{i}),d0{i},'k',1:length(d0{i}),d1{i},'r');
+%     plot(th(1:th_num(i),i),loss(1:th_num(i),i),'x-')
+%     plot(th(1:th_num(i),i),yy(1:th_num(i),i),th(1:th_num(i),i),zz(1:th_num(i),i),'x-')
+end
+
+% 
+a=num;
+for i=1:a;loss_diff_ratio(i)=(lossmax(i)-lossmin(i))/lossmax(i);end;
+for i=1:a;loss_diff(i)=(lossmax(i)-lossmin(i));end;
+test=round(vertcat(id(1:a),gene_length(1:a),best_theta(1:a),best_y(1:a),best_z(1:a),loss_diff_ratio,loss_diff,lossmax(1:a),lossmin(1:a),lossavg(1:a))',2);
+
+% p1=plot(loss_diff(1:a),best_z(1:a),'o');
+% hold on
+% p2=plot(loss_diff(1:a),best_y(1:a),'go');
+% xlabel('loss difference ratio (LDR)');
+% legend( [p1,p2],'LDR-z','LDR-y')
+% axis([0 1 0 2.5])
+% hold off
+% print('loss_diff_ratio vs. y and z.png','-dpng','-r300');
+
+endtime=datestr(now)
+
+filename='outputAll.mat';
+save(filename);
+
+toc
+\end{lstlisting}
+
+\end{document}
