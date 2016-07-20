@@ -32,7 +32,7 @@ for(i in 1:nrow(WT_rep1.mat)){
   
   write.table(rbind(c(row.names(WT_rep1.mat[i,]), WT_rep1.mat[i,1:6], WT.avg), c(row.names(WT_rep1.mat[i,]), WT_rep1.mat[i,1:6], mut.avg)), file=paste0("gene_",i,"_WTavg_MUTavg.txt"), sep="\t", quote=F, row.names=F, col.names=F)
   
-  system(paste0("bsub -M 30 -q week -J gene",i," Rscript /proj/strahllb/users/Austin/Stephen/nutrient_deprivation/determine_cryptic_jumps_and_rates.R gene_",i,"_WTavg_MUTavg.txt gene_",i,"_WTavg_MUTavg_out.txt gene_",i,"_WTavg_MUTavg_loss.txt"))
+  system(paste0("bsub -M 30 -q week -J gene",i," Rscript /proj/strahllb/users/Jie/Stephen/determine_cryptic_jumps_and_rates.R gene_",i,"_WTavg_MUTavg.txt gene_",i,"_WTavg_MUTavg_out.txt gene_",i,"_WTavg_MUTavg_loss.txt"))
 }
 
 write.table(as.matrix(t(out.mat)), file="failed_genes_WTavg_MUTavg_out.txt", quote=F, sep="\t", col.names=F, row.names=F)
