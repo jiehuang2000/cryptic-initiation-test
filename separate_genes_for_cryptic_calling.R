@@ -9,7 +9,7 @@ mut_rep1.mat = read.table(args[4], sep="\t", row.names=1, header=T)
 mut_rep2.mat = read.table(args[5], sep="\t", row.names=1, header=T)
 mut_rep3.mat = read.table(args[6], sep="\t", row.names=1, header=T)
 
-out.mat = c("Gene_Name","Best_Theta","Best_y","Best_z","Max_minus_Min_of_lossFunction")
+out.mat = c("Gene_Name","notes", "Best_Theta","Best_y","Best_z","Max_minus_Min_of_lossFunction")
 
 for(i in 1:nrow(WT_rep1.mat)){
   #get average of reps
@@ -21,12 +21,12 @@ for(i in 1:nrow(WT_rep1.mat)){
   
   if(mean(WT.avg) <= 5 | mean(mut.avg) <= 5){
     cat(paste0("Gene #", i, " aka ", row.names(WT_rep1.mat)[i], " had too few reads! It has an average of ", mean(WT.avg), " WT reads and ", mean(mut.avg), " mutant reads; it must be at least 5\n"))
-    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "reads<=5 "))
+    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i],  "reads<=5 ","NA", "NA", "NA", "NA"))
     next
   }
   else if(length(WT.avg) <= 700){
     cat(paste0("Gene #", i, " aka ", row.names(WT_rep1.mat)[i], " was too small! It was ", length(WT.avg), " and it must be at least 700bp\n"))
-    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "NA", "NA", "NA", "NA", "lens<=700 "))
+    out.mat = rbind(out.mat, c(row.names(WT_rep1.mat)[i], "lens<=700 ", "NA", "NA", "NA", "NA"))
     next
   }
   
